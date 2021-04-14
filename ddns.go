@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"ddns/web"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -10,6 +9,8 @@ import (
 	"net"
 	"os"
 	"time"
+
+	"github.com/nerdinary/nsupdate-ddns/web"
 )
 
 const (
@@ -55,19 +56,21 @@ func (i *ips) checkLocal(ctx context.Context) error {
 	currV4, err := r.LookupIP(ctx, "ip4", i.cfg.Hostname)
 	if err != nil {
 		// If no address is set, we don't want to fail as it'll require an update.
-		fmt.Println(err)
-	}
-	for _, c := range currV4 {
-		i.v4.public = c.To4().String()
+		log.Printf("no v4 address set: %v", err)
+	} else {
+		for _, c := range currV4 {
+			i.v4.public = c.To4().String()
+		}
 	}
 
 	currV6, err := r.LookupIP(ctx, "ip6", i.cfg.Hostname)
 	if err != nil {
 		// If no address is set, we don't want to fail as it'll require an update.
-		fmt.Println(err)
-	}
-	for _, c := range currV6 {
-		i.v6.public = c.To16().String()
+		log.Printf("no v6 address set: %v", err)
+	} else {
+		for _, c := range currV6 {
+			i.v6.public = c.To16().String()
+		}
 	}
 	return nil
 }
@@ -77,11 +80,13 @@ func (i *ips) checkPublic() error {
 	var err error
 	i.v4.current, err = web.MakeRequest(v4Check)
 	if err != nil {
+		// Fail if we don't have v4 connectivity.
 		return err
 	}
 	i.v6.current, err = web.MakeRequest(v6Check)
 	if err != nil {
-		return err
+		// If no v6 address was found, assume that this is a v4 node only.
+		log.Printf("v6 address resolution error: %v", err)
 	}
 	return nil
 }
